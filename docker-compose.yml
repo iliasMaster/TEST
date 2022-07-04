@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  reverseproxy:
+    build:
+      context: .
+      dockerfile: nginx.Dockerfile
+    networks:
+      - front-network
+      - back-network
+    ports:
+      - "443:443" 
+      - "80:80" 
+    restart: always
+    volumes:
+      - ./nginx/conf/:/etc/nginx/conf.d/:ro
+  postgres:
+    depends_on:
+      - reverseproxy 
+    build:
+      context: .
+      dockerfile: postgres.Dockerfile
+    environment:
+      - POSTGRES_USER=flowable
+      - POSTGRES_PASSWORD=flowable
+      - POSTGRES_DB=flowable
+      - POSTGRES_HOST_AUTH_METHOD=password
+    networks:
+      - back-network    
+    ports:
+      - "15432:5432"  
+    restart: always
+  flowableui:
+    depends_on:
+      - postgres
+    build:
+      context: .
+      dockerfile: flowable.Dockerfile
+    environment:
+      - SPRING_DATASOURCE_DRIVER-CLASS-NAME=org.postgresql.Driver
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:15432/flowable
+      - SPRING_DATASOURCE_USERNAME=flowable 
+      - SPRING_DATASOURCE_PASSWORD=flowable
+    networks:
+      - back-network    
+    ports:
+      - "8080:8080"  
+    restart: always
+  angularboite:
+      depends_on:
+        - flowableui
+      build:
+        context: ./BoiteATacheTemplate
+        dockerfile: Dockerfile
+      ports:
+        - 4200:4200
+      networks:
+        - back-network 
+networks:
+  front-network:
+    driver: bridge
+  back-network:
+    driver: bridge  
